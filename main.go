@@ -53,7 +53,7 @@ func providerSchema() map[string]*schema.Schema {
 
 func providerResources() map[string]*schema.Resource {
 	return map[string]*schema.Resource{
-		"init": {
+		"vault_init": {
 			SchemaVersion: 1,
 			Create:        createFunc,
 			Read:          readFunc,
@@ -62,6 +62,14 @@ func providerResources() map[string]*schema.Resource {
 			Schema: map[string]*schema.Schema{ // List of supported configuration fields for your resource
 				"unseal": {
 					Type:     schema.TypeBool,
+					Required: true,
+				},
+				"secret_shares": {
+					Type:     schema.TypeInt,
+					Required: true,
+				},
+				"secret_threshold": {
+					Type:     schema.TypeInt,
 					Required: true,
 				},
 			},
