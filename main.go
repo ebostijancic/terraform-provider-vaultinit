@@ -81,11 +81,13 @@ func providerResources() map[string]*schema.Resource {
 					Type:     schema.TypeList,
 					Optional: true,
 					Computed: true,
+					Elem:     schema.TypeString,
 				},
 				"keys_base64": {
 					Type:     schema.TypeList,
 					Optional: true,
 					Computed: true,
+					Elem:     schema.TypeString,
 				},
 			},
 		},
