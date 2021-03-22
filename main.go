@@ -59,7 +59,7 @@ func providerResources() map[string]*schema.Resource {
 			Read:          readFunc,
 			Update:        updateFunc,
 			Delete:        deleteFunc,
-			Schema: map[string]*schema.Schema{ // List of supported configuration fields for your resource
+			Schema: map[string]*schema.Schema{
 				"unseal": {
 					Type:     schema.TypeBool,
 					Required: true,
@@ -71,6 +71,21 @@ func providerResources() map[string]*schema.Resource {
 				"secret_threshold": {
 					Type:     schema.TypeInt,
 					Required: true,
+				},
+				"root_token": {
+					Type:     schema.TypeString,
+					Optional: true,
+					Computed: true,
+				},
+				"keys": {
+					Type:     schema.TypeList,
+					Optional: true,
+					Computed: true,
+				},
+				"keys_base64": {
+					Type:     schema.TypeList,
+					Optional: true,
+					Computed: true,
 				},
 			},
 		},
