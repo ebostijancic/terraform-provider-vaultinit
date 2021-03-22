@@ -16,31 +16,11 @@ limitations under the License.
 package main
 
 import (
+	"github.com/ebostijancic/terraform-provider-vaultinit/vault"
 	"github.com/hashicorp/terraform/helper/schema"
 	"github.com/hashicorp/terraform/plugin"
 	"github.com/hashicorp/terraform/terraform"
 )
-
-type ExampleClient struct {
-	ApiKey     string
-	Endpoint   string
-	Timeout    int
-	MaxRetries int
-}
-
-type Machine struct {
-	Name string
-	CPUs int
-	RAM  int
-}
-
-func (m *Machine) Id() string {
-	return "id-" + m.Name + "!"
-}
-
-func (c *ExampleClient) CreateMachine(m *Machine) error {
-	return nil
-}
 
 func main() {
 	opts := plugin.ServeOpts{
@@ -50,7 +30,7 @@ func main() {
 }
 
 func Provider() terraform.ResourceProvider {
-	return &schema.Provider{ // Source https://github.com/hashicorp/terraform/blob/v0.6.6/helper/schema/provider.go#L20-L43
+	return &schema.Provider{
 		Schema:        providerSchema(),
 		ResourcesMap:  providerResources(),
 		ConfigureFunc: providerConfigure,
@@ -63,54 +43,25 @@ func Provider() terraform.ResourceProvider {
 // More info in https://github.com/hashicorp/terraform/blob/v0.6.6/helper/schema/schema.go#L29-L142
 func providerSchema() map[string]*schema.Schema {
 	return map[string]*schema.Schema{
-		"api_key": &schema.Schema{
+		"vault_url": {
 			Type:        schema.TypeString,
 			Required:    true,
-			Description: "API Key used to authenticate with the service provider",
-		},
-		"endpoint": &schema.Schema{
-			Type:        schema.TypeString,
-			Required:    true,
-			Description: "The URL to the API",
-		},
-		"timeout": &schema.Schema{
-			Type:        schema.TypeInt,
-			Required:    true,
-			Description: "Max. wait time we should wait for a successful connection to the API",
-		},
-		"max_retries": &schema.Schema{
-			Type:        schema.TypeInt,
-			Required:    true,
-			Description: "The max. amount of times we will retry to connect to the API",
+			Description: "URL of the Vault instance to initialize",
 		},
 	}
 }
 
-// List of supported resources and their configuration fields.
-// Here we define da linked list of all the resources that we want to
-// support in our provider. As an example, if you were to write an AWS provider
-// which supported resources like ec2 instances, elastic balancers and things of that sort
-// then this would be the place to declare them.
-// More info here https://github.com/hashicorp/terraform/blob/v0.6.6/helper/schema/resource.go#L17-L81
 func providerResources() map[string]*schema.Resource {
 	return map[string]*schema.Resource{
-		"awesome_machine": &schema.Resource{
+		"init": {
 			SchemaVersion: 1,
 			Create:        createFunc,
 			Read:          readFunc,
 			Update:        updateFunc,
 			Delete:        deleteFunc,
 			Schema: map[string]*schema.Schema{ // List of supported configuration fields for your resource
-				"name": &schema.Schema{
-					Type:     schema.TypeString,
-					Required: true,
-				},
-				"cpus": &schema.Schema{
-					Type:     schema.TypeInt,
-					Required: true,
-				},
-				"ram": &schema.Schema{
-					Type:     schema.TypeInt,
+				"unseal": {
+					Type:     schema.TypeBool,
 					Required: true,
 				},
 			},
@@ -122,16 +73,9 @@ func providerResources() map[string]*schema.Resource {
 // to our provider which we will use to initialise a dummy client that
 // interacts with the API.
 func providerConfigure(d *schema.ResourceData) (interface{}, error) {
-	client := ExampleClient{
-		ApiKey:     d.Get("api_key").(string),
-		Endpoint:   d.Get("endpoint").(string),
-		Timeout:    d.Get("timeout").(int),
-		MaxRetries: d.Get("max_retries").(int),
+	client := vault.Client{
+		URL: d.Get("vault_url").(string),
 	}
-
-	// You could have some field validations here, like checking that
-	// the API Key is has not expired or that the username/password
-	// combination is valid, etc.
 
 	return &client, nil
 }
@@ -146,21 +90,22 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 // imply that something went wrong with the modification of the resource and it
 // will prevent the execution of further calls that depend on that resource
 // that failed to be created/updated/deleted.
-
 func createFunc(d *schema.ResourceData, meta interface{}) error {
-	client := meta.(*ExampleClient)
-	machine := Machine{
-		Name: d.Get("name").(string),
-		CPUs: d.Get("cpus").(int),
-		RAM:  d.Get("ram").(int),
-	}
+	client := meta.(*vault.Client)
+	client.DoUnseal = d.Get("unseal").(bool)
 
-	err := client.CreateMachine(&machine)
+	secretShares := d.Get("secret_shares").(int)
+	secretThreshold := d.Get("secret_threshold").(int)
+
+	resp, err := client.Init(uint8(secretShares), uint8(secretThreshold))
 	if err != nil {
 		return err
 	}
 
-	d.SetId(machine.Id())
+	d.SetId(client.URL)
+	d.Set("root_token", resp.RootToken)
+	d.Set("keys_base64", resp.KeysBase64)
+	d.Set("keys", resp.Keys)
 
 	return nil
 }
